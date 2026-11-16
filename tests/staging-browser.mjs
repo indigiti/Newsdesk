@@ -4,7 +4,7 @@ const [headline, source, absent] = process.argv.slice(2);
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
-  await page.goto('http://127.0.0.1:8080/');
+  await page.goto('http://127.0.0.1:8080/newsdesk/');
   await page.getByRole('heading', { name: headline, exact: true }).waitFor({ timeout: 10000 });
   await page.getByRole('link', { name: new RegExp(source) }).waitFor();
   if (absent && await page.getByRole('heading', { name: absent, exact: true }).count()) {
