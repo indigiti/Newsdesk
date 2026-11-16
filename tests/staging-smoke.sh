@@ -34,9 +34,21 @@ php_pid=$!
 curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 --cacert "$root/cert.pem" https://127.0.0.1:9443/a.xml >/dev/null
 storage="$root/private_html/newsdesk/storage"
 api=http://127.0.0.1:8080/newsdesk/api/stories.php
+defaults="$root/private_html/newsdesk/config/feeds.default.json"
+cmp config/feeds.default.json "$defaults"
+jq -e 'length == 5 and any(.[]; .name == "Business Standard Markets")' "$defaults"
+[[ ! -e "$root/public_html/newsdesk/config/feeds.default.json" ]]
+mv "$defaults" "$root/defaults.json"
 mv "$storage/feeds.json" "$root/config.json"
+rmdir "$storage"
 curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 "$api" | jq -e '.updated_at == null and .refresh_status == "feeds_not_configured"'
+# Simulate a clean install with one broken bundled source. Do not hit real publishers in CI.
+jq '.[1].url = "https://127.0.0.1:9443/missing.xml"' "$root/config.json" > "$defaults"
+curl -fsS "$api" | jq -e '.updated_at != null and (.stories | length) == 1 and (.stories[0].articles | length) == 1'
+test -f "$storage/stories.json"
+rm "$storage/stories.json" "$storage/refresh-attempt"
 mv "$root/config.json" "$storage/feeds.json"
+# The custom configuration takes precedence over the bundled one.
 # First browser visit must create the snapshot without CLI or cron.
 node tests/staging-browser.mjs 'Central bank holds rates' 'Publisher B' 'Governor announces follow-up'
 curl -fsS http://127.0.0.1:8080/newsdesk/api/stories.php | jq -e '(.stories | length) == 1 and (.stories[0].articles | length) == 2'

@@ -29,10 +29,11 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Package DigiOps release
         run: |
-          mkdir -p release/public/api release/private/bin release/private/build
+          mkdir -p release/public/api release/private/bin release/private/build release/private/config
           cp -a out/. release/public/
           cp php/api/stories.php release/public/api/
           cp php/ingest.php php/refresh.php release/private/bin/
+          cp config/feeds.default.json release/private/config/
           php tools/package-release.php
       - name: Verify packaged inbox and PHP
         run: |
