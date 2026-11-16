@@ -32,7 +32,7 @@ jobs:
           mkdir -p release/public/api release/private/bin release/private/build
           cp -a out/. release/public/
           cp php/api/stories.php release/public/api/
-          cp php/ingest.php release/private/bin/
+          cp php/ingest.php php/refresh.php release/private/bin/
           php tools/package-release.php
       - name: Verify packaged inbox and PHP
         run: |
