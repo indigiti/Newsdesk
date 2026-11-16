@@ -29,22 +29,31 @@ feed a 'Central bank holds rates' a
 feed b 'CENTRAL BANK HOLDS RATES' b
 python3 tests/fixture-server.py "$root/feeds" "$root/cert.pem" "$root/key.pem" &
 fixture_pid=$!
-php -S 127.0.0.1:8080 -t "$root/public_html" &
+NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 php -d "curl.cainfo=$root/cert.pem" -S 127.0.0.1:8080 -t "$root/public_html" &
 php_pid=$!
 curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 --cacert "$root/cert.pem" https://127.0.0.1:9443/a.xml >/dev/null
-curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:8080/newsdesk/api/stories.php | jq -e '.updated_at == null and .stories == []'
-ingest() { NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 php -d "curl.cainfo=$root/cert.pem" "$root/private_html/newsdesk/bin/ingest.php" "$root/private_html/newsdesk/storage"; }
-ingest
+storage="$root/private_html/newsdesk/storage"
+api=http://127.0.0.1:8080/newsdesk/api/stories.php
+mv "$storage/feeds.json" "$root/config.json"
+curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 "$api" | jq -e '.updated_at == null and .refresh_status == "feeds_not_configured"'
+mv "$root/config.json" "$storage/feeds.json"
+# First browser visit must create the snapshot without CLI or cron.
+node tests/staging-browser.mjs 'Central bank holds rates' 'Publisher B' 'Governor announces follow-up'
 curl -fsS http://127.0.0.1:8080/newsdesk/api/stories.php | jq -e '(.stories | length) == 1 and (.stories[0].articles | length) == 2'
 node tests/staging-browser.mjs 'Central bank holds rates' 'Publisher B' 'Governor announces follow-up'
 feed b 'Governor announces follow-up' follow-up
-ingest
+curl -fsS -D "$root/fresh.headers" "$api" | jq -e '(.stories | length) == 1'
+grep -Eiq '^X-NewsDesk-Refresh: fresh' "$root/fresh.headers"
+touch -d '10 minutes ago' "$storage/stories.json" "$storage/refresh-attempt"
 curl -fsS http://127.0.0.1:8080/newsdesk/api/stories.php | jq -e '(.stories | length) == 2'
 node tests/staging-browser.mjs 'Governor announces follow-up' 'Publisher B'
 cp "$root/private_html/newsdesk/storage/stories.json" "$root/before.json"
 rm "$root/feeds/b.xml"
-if ingest; then echo 'Expected a failed ingest when the source disappears' >&2; exit 1; fi
-curl -fsS http://127.0.0.1:8080/newsdesk/api/stories.php > "$root/after.json"
+touch -d '10 minutes ago' "$storage/stories.json" "$storage/refresh-attempt"
+curl -fsS -D "$root/failed.headers" "$api" > "$root/after.json"
+grep -Eiq '^X-NewsDesk-Refresh: refresh_failed' "$root/failed.headers"
+curl -fsS -D "$root/cooldown.headers" "$api" >/dev/null
+grep -Eiq '^X-NewsDesk-Refresh: retry_cooldown' "$root/cooldown.headers"
 cmp "$root/before.json" "$root/after.json"
 # PHP's dev server can return index.html for missing paths. Verify the
 # response is a fallback page (or a 404), never the private snapshot.

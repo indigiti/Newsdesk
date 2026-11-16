@@ -1,11 +1,9 @@
 # NewsDesk on DigiOps
 
-Use repository indigiti/Newsdesk, branch main, artifact digiops-release, application URL /newsdesk/, public path public_html/newsdesk/, and private path private_html/newsdesk/. The build is specific to this subpath. The package contains RELEASE.json, public/ and private/. Node runs in CI only.
+Use repository indigiti/Newsdesk, branch main, artifact digiops-release, application URL /newsdesk/, public path public_html/newsdesk/, and private path private_html/newsdesk/. The package contains RELEASE.json, public/ and private/. Node runs in CI only.
 
-In DigiOps, deploy a successful main-branch run. The initial health path / checks the static dashboard; also verify /newsdesk/api/stories.php returns JSON. No snapshot yet is expected on a fresh deployment.
+Deploy a successful main build. Upload feeds.json to private_html/newsdesk/storage/ using a graphical SFTP client. This file is a JSON array of objects with name and url fields. Start with one trusted, operator-approved public HTTPS RSS 2.0 feed. Never accept feed URLs from visitors or place configuration in the web root. The PHP-FPM user must be able to read the feed configuration and write in storage. Enable cURL, SimpleXML and mbstring in web PHP.
 
-Create private_html/newsdesk/storage/ outside the public web root. Write feeds.json there as a JSON array of objects with name and url fields (trusted, operator-approved public HTTPS RSS 2.0 feeds). Do not include credentials, feeds or snapshots in the artifact. Give cron write access and PHP-FPM read access. Enable PHP cURL, SimpleXML and mbstring, and schedule:
+Open /newsdesk/ to fetch the first snapshot. No cron or terminal is required. The stories API refreshes missing or five-minute-old snapshots on demand; fresh snapshots skip network calls. The triggering request can wait up to eight seconds for feed I/O. A nonblocking lock prevents parallel refreshes, and failed attempts back off for at least one minute. The previous snapshot remains available if any configured feed fails. No visits or API requests means no refresh. CLI ingestion remains optional and shares the lock.
 
-    php /absolute/app/private_html/newsdesk/bin/ingest.php /absolute/app/private_html/newsdesk/storage
-
-Run once manually and verify the inbox loads new stories without a rebuild. Check that the storage directory is not accessible from the web. The manifest declares storage/ persistent; verify it survives a redeploy on the target. Restrict staging access before adding nonpublic content.
+Confirm /newsdesk/api/stories.php returns non-null updated_at and inspect X-NewsDesk-Refresh for refresh status. Verify that storage/ is private and survives a DigiOps redeploy. The static dashboard health check alone does not verify ingestion.
