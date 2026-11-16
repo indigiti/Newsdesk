@@ -1,3 +1,3 @@
 import './globals.css';
-export const metadata={title:'NewsDesk | Story Inbox'};
-export default function Layout({children}){return <html lang="en"><body className="min-h-screen bg-slate-950 text-slate-100">{children}</body></html>}
+export const metadata={title:'NewsDesk | Market Intelligence',description:'A newsroom workspace for comparing publisher coverage.'};
+export default function Layout({children}){return <html lang="en"><body>{children}</body></html>}
