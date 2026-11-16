@@ -9,3 +9,7 @@ Use a dedicated Custom PHP app at the domain root. No WordPress or Node process 
 5. Add a new item to a test feed, run ingestion again, and check the inbox without rebuilding. Confirm that a failed feed refresh leaves the previous snapshot intact.
 
 The first slice uses exact normalized headline matches, not semantic clustering. It does not include authentication, shadcn components, editorial merge/split, SQL, Redis, or AI. No article proxy is shipped.
+
+## CI validation and release artifact
+
+The Staging checks workflow builds the static app and exercises it through PHP's local test server with a controlled HTTPS RSS fixture. On success, download the `newsdesk-cloudways` artifact. Copy only its `public_html/` contents into the Cloudways web root. Install `bin/ingest.php` alongside, not inside, the web root. The artifact contains no credentials, feed configuration, or live data. Repeat the smoke test on Cloudways: CI does not verify that host's cron permissions, PHP configuration, or access restrictions.

@@ -1,0 +1,45 @@
+name: Staging checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install PHP and RSS extensions
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php-cli php-curl php-xml php-mbstring
+          php -m
+      - name: Build static frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Install browser test tooling
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+      - name: Verify PHP and static inbox
+        run: |
+          find php -name '*.php' -exec php -l {} \;
+          bash tests/staging-smoke.sh
+      - name: Package Cloudways release
+        run: |
+          mkdir -p release/public_html/api release/bin
+          cp -a out/. release/public_html/
+          cp php/api/stories.php release/public_html/api/
+          cp php/ingest.php release/bin/
+          cp docs/staging.md release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: newsdesk-cloudways
+          path: release/
+          if-no-files-found: error
