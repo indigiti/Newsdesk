@@ -27,19 +27,19 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
-      - name: Verify PHP and static inbox
+      - name: Package DigiOps release
         run: |
-          find php -name '*.php' -exec php -l {} \;
+          mkdir -p release/public/api release/private/bin release/private/build
+          cp -a out/. release/public/
+          cp php/api/stories.php release/public/api/
+          cp php/ingest.php release/private/bin/
+          php tools/package-release.php
+      - name: Verify packaged inbox and PHP
+        run: |
+          find php tools -name '*.php' -exec php -l {} \;
           bash tests/staging-smoke.sh
-      - name: Package Cloudways release
-        run: |
-          mkdir -p release/public_html/api release/bin
-          cp -a out/. release/public_html/
-          cp php/api/stories.php release/public_html/api/
-          cp php/ingest.php release/bin/
-          cp docs/staging.md release/
       - uses: actions/upload-artifact@v4
         with:
-          name: newsdesk-cloudways
+          name: digiops-release
           path: release/
           if-no-files-found: error

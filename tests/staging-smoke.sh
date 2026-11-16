@@ -9,12 +9,14 @@ cleanup() {
   rm -rf "$root"
 }
 trap cleanup EXIT
-mkdir -p "$root"/{feeds,newsdesk-private,public_html/api}
-cp -a out/. "$root/public_html/"
-cp php/api/stories.php "$root/public_html/api/"
+mkdir -p "$root"/{feeds,public_html,private_html/newsdesk/storage}
+cp -a release/public "$root/public_html/newsdesk"
+cp -a release/private/. "$root/private_html/newsdesk/"
+jq -e '.schema == "DIGIOPS-RELEASE/1" and .public == "public" and .private == "private" and .persistentPaths == ["storage/"]' release/RELEASE.json
+cmp release/RELEASE.json "$root/private_html/newsdesk/build/release.json"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=127.0.0.1' \
   -addext 'subjectAltName=IP:127.0.0.1' -keyout "$root/key.pem" -out "$root/cert.pem" 2>/dev/null
-cat >"$root/newsdesk-private/feeds.json" <<'EOF'
+cat >"$root/private_html/newsdesk/storage/feeds.json" <<'EOF'
 [
   {"name":"Publisher A","url":"https://127.0.0.1:9443/a.xml"},
   {"name":"Publisher B","url":"https://127.0.0.1:9443/b.xml"}
@@ -30,24 +32,24 @@ fixture_pid=$!
 php -S 127.0.0.1:8080 -t "$root/public_html" &
 php_pid=$!
 curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 --cacert "$root/cert.pem" https://127.0.0.1:9443/a.xml >/dev/null
-curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:8080/api/stories.php | jq -e '.updated_at == null and .stories == []'
-ingest() { NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 php -d "curl.cainfo=$root/cert.pem" php/ingest.php "$root/newsdesk-private"; }
+curl -fsS --noproxy '*' --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:8080/newsdesk/api/stories.php | jq -e '.updated_at == null and .stories == []'
+ingest() { NO_PROXY=127.0.0.1 no_proxy=127.0.0.1 php -d "curl.cainfo=$root/cert.pem" "$root/private_html/newsdesk/bin/ingest.php" "$root/private_html/newsdesk/storage"; }
 ingest
-curl -fsS http://127.0.0.1:8080/api/stories.php | jq -e '(.stories | length) == 1 and (.stories[0].articles | length) == 2'
+curl -fsS http://127.0.0.1:8080/newsdesk/api/stories.php | jq -e '(.stories | length) == 1 and (.stories[0].articles | length) == 2'
 node tests/staging-browser.mjs 'Central bank holds rates' 'Publisher B' 'Governor announces follow-up'
 feed b 'Governor announces follow-up' follow-up
 ingest
-curl -fsS http://127.0.0.1:8080/api/stories.php | jq -e '(.stories | length) == 2'
+curl -fsS http://127.0.0.1:8080/newsdesk/api/stories.php | jq -e '(.stories | length) == 2'
 node tests/staging-browser.mjs 'Governor announces follow-up' 'Publisher B'
-cp "$root/newsdesk-private/stories.json" "$root/before.json"
+cp "$root/private_html/newsdesk/storage/stories.json" "$root/before.json"
 rm "$root/feeds/b.xml"
 if ingest; then echo 'Expected a failed ingest when the source disappears' >&2; exit 1; fi
-curl -fsS http://127.0.0.1:8080/api/stories.php > "$root/after.json"
+curl -fsS http://127.0.0.1:8080/newsdesk/api/stories.php > "$root/after.json"
 cmp "$root/before.json" "$root/after.json"
 # PHP's dev server can return index.html for missing paths. Verify the
 # response is a fallback page (or a 404), never the private snapshot.
-[[ ! -e "$root/public_html/newsdesk-private" ]]
-code=$(curl -sS -D "$root/direct.headers" -o "$root/direct.body" -w '%{http_code}' http://127.0.0.1:8080/newsdesk-private/stories.json)
+[[ ! -e "$root/public_html/private_html" ]]
+code=$(curl -sS -D "$root/direct.headers" -o "$root/direct.body" -w '%{http_code}' http://127.0.0.1:8080/private_html/newsdesk/storage/stories.json)
 if grep -Fiq 'Governor announces follow-up' "$root/direct.body"; then
   echo 'Private snapshot content was exposed' >&2
   exit 1
@@ -55,6 +57,6 @@ fi
 if [[ $code != 404 ]]; then
   [[ $code == 200 ]]
   grep -Eiq '^Content-Type: text/html' "$root/direct.headers"
-  cmp "$root/public_html/index.html" "$root/direct.body"
+  cmp "$root/public_html/newsdesk/index.html" "$root/direct.body"
 fi
 echo 'Private snapshot is not directly served'
