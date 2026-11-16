@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Economic Times Markets",
+    "url": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"
+  },
+  {
+    "name": "Business Standard Markets",
+    "url": "https://www.business-standard.com/rss/markets-106.rss"
+  },
+  {
+    "name": "RBI Press Releases",
+    "url": "https://rbi.org.in/pressreleases_rss.xml"
+  },
+  {
+    "name": "SEBI Regulatory Updates",
+    "url": "https://www.sebi.gov.in/sebirss.xml"
+  },
+  {
+    "name": "Federal Reserve Monetary Policy",
+    "url": "https://www.federalreserve.gov/feeds/press_monetary.xml"
+  }
+]
