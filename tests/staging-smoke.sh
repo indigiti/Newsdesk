@@ -44,5 +44,17 @@ rm "$root/feeds/b.xml"
 if ingest; then echo 'Expected a failed ingest when the source disappears' >&2; exit 1; fi
 curl -fsS http://127.0.0.1:8080/api/stories.php > "$root/after.json"
 cmp "$root/before.json" "$root/after.json"
-code=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/newsdesk-private/stories.json)
-[[ $code == 404 ]]
+# PHP's dev server can return index.html for missing paths. Verify the
+# response is a fallback page (or a 404), never the private snapshot.
+[[ ! -e "$root/public_html/newsdesk-private" ]]
+code=$(curl -sS -D "$root/direct.headers" -o "$root/direct.body" -w '%{http_code}' http://127.0.0.1:8080/newsdesk-private/stories.json)
+if grep -Fiq 'Governor announces follow-up' "$root/direct.body"; then
+  echo 'Private snapshot content was exposed' >&2
+  exit 1
+fi
+if [[ $code != 404 ]]; then
+  [[ $code == 200 ]]
+  grep -Eiq '^Content-Type: text/html' "$root/direct.headers"
+  cmp "$root/public_html/index.html" "$root/direct.body"
+fi
+echo 'Private snapshot is not directly served'
